@@ -1,0 +1,119 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RoomVision 3D — Interior Planner</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="logo">Room<span>Vision</span> 3D</div>
+    <div class="pill">INTERIOR DESIGN STUDIO</div>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <h2>Pengaturan Ruangan</h2>
+      <label>Nama proyek</label>
+      <input id="project" type="text" value="Ruang Impian Saya">
+
+      <h3>Ukuran ruangan</h3>
+      <div class="row">
+        <div>
+          <label>Lebar (m)</label>
+          <input id="roomW" type="number" min="3" max="10" value="5">
+        </div>
+        <div>
+          <label>Panjang (m)</label>
+          <input id="roomD" type="number" min="3" max="10" value="6">
+        </div>
+      </div>
+
+      <label>Tinggi dinding</label>
+      <input id="roomH" type="number" min="2" max="5" step=".1" value="3">
+
+      <h3>Warna interior</h3>
+      <label>Dinding</label>
+      <input id="wallColor" type="color" value="#e9e2d5">
+
+      <label>Lantai</label>
+      <input id="floorColor" type="color" value="#a97850">
+
+      <label>Warna furnitur baru</label>
+      <input id="furnitureColor" type="color" value="#8b7cff">
+
+      <button class="primary full" id="apply">
+        Terapkan pengaturan
+      </button>
+
+      <p class="small">
+        Tip: klik furnitur untuk memilih, kemudian gunakan
+        tombol putar atau hapus di panel kanan.
+      </p>
+    </aside>
+
+    <section class="canvas">
+      <canvas id="scene"></canvas>
+      <div class="hint">
+        Seret untuk memutar • Scroll untuk zoom •
+        Klik furnitur untuk memilih
+      </div>
+    </section>
+
+    <aside class="panel right">
+      <div>
+        <h2>Tambah Furnitur</h2>
+        <div class="furniture">
+          <button data-kind="sofa"><b>🛋️</b>Sofa</button>
+          <button data-kind="bed"><b>🛏️</b>Tempat tidur</button>
+          <button data-kind="table"><b>▰</b>Meja</button>
+          <button data-kind="chair"><b>🪑</b>Kursi</button>
+          <button data-kind="plant"><b>🪴</b>Tanaman</button>
+          <button data-kind="lamp"><b>💡</b>Lampu</button>
+        </div>
+      </div>
+
+      <div>
+        <h2>Objek Terpilih</h2>
+        <p id="selectedName" class="small">
+          Belum ada objek dipilih.
+        </p>
+
+        <div class="row">
+          <button id="rotate">↻ Putar</button>
+          <button id="delete">Hapus</button>
+        </div>
+
+        <label>Warna objek</label>
+        <input id="selectedColor" type="color" value="#8b7cff">
+      </div>
+
+      <div>
+        <h2>Ringkasan</h2>
+        <div class="stat">
+          <span class="small">Jumlah furnitur</span>
+          <strong id="count">0</strong>
+        </div>
+
+        <div class="stat">
+          <span class="small">Luas ruangan</span>
+          <strong id="area">30 m²</strong>
+        </div>
+
+        <button class="full" id="reset" style="margin-top:12px">
+          Reset desain
+        </button>
+
+        <button class="primary full" id="save" style="margin-top:8px">
+          Simpan desain (JSON)
+        </button>
+      </div>
+    </aside>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
