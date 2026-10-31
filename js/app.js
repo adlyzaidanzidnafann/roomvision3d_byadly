@@ -1,17 +1,61 @@
 
-const canvas = document.querySelector('#scene');
+/* =========================================
+   ROOMVISION 3D
+   Main JavaScript Application
+========================================= */
+
+// Mengambil elemen HTML
+const $ = id => document.getElementById(id);
+
+const canvas = $('scene');
+
+const roomW = $('roomW');
+const roomD = $('roomD');
+const roomH = $('roomH');
+
+const floorColor = $('floorColor');
+const wallColor = $('wallColor');
+const furnitureColor = $('furnitureColor');
+
+const project = $('project');
+
+const selectedName = $('selectedName');
+const selectedColor = $('selectedColor');
+
+const count = $('count');
+const area = $('area');
+
+const apply = $('apply');
+const rotate = $('rotate');
+const deleteBtn = $('delete');
+const reset = $('reset');
+const save = $('save');
+
+// Memastikan elemen utama tersedia
+if (!canvas || !roomW || !roomD || !roomH) {
+  throw new Error('Elemen HTML RoomVision 3D tidak ditemukan.');
+}
+
+
+/* =========================================
+   THREE.JS SETUP
+========================================= */
 
 const renderer = new THREE.WebGLRenderer({
-  canvas,
+  canvas: canvas,
   antialias: true,
   preserveDrawingBuffer: true
 });
 
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+renderer.setPixelRatio(
+  Math.min(window.devicePixelRatio || 1, 2)
+);
+
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
+
 scene.background = new THREE.Color('#172238');
 
 const camera = new THREE.PerspectiveCamera(
@@ -23,6 +67,7 @@ const camera = new THREE.PerspectiveCamera(
 
 camera.position.set(8, 7, 10);
 
+// Pencahayaan
 const hemi = new THREE.HemisphereLight(
   0xffffff,
   0x667080,
@@ -31,121 +76,221 @@ const hemi = new THREE.HemisphereLight(
 
 scene.add(hemi);
 
-const light = new THREE.DirectionalLight(0xffffff, 2.5);
+const light = new THREE.DirectionalLight(
+  0xffffff,
+  2.5
+);
+
 light.position.set(5, 10, 7);
 light.castShadow = true;
+
 scene.add(light);
 
-let roomGroup = new THREE.Group();
+// Grup ruangan
+const roomGroup = new THREE.Group();
+
 scene.add(roomGroup);
 
+// Data furnitur
 let furniture = [];
 let selected = null;
 
-const mat = (c, rough = 0.8) =>
-  new THREE.MeshStandardMaterial({
-    color: c,
-    roughness: rough
-  });
 
-function box(w, h, d, m, x, y, z, parent = roomGroup) {
-  const o = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    m
+/* =========================================
+   MATERIAL DAN OBJECT
+========================================= */
+
+function mat(color, roughness = 0.8) {
+  return new THREE.MeshStandardMaterial({
+    color: color,
+    roughness: roughness
+  });
+}
+
+function box(
+  width,
+  height,
+  depth,
+  material,
+  x,
+  y,
+  z,
+  parent = roomGroup
+) {
+  const object = new THREE.Mesh(
+    new THREE.BoxGeometry(width, height, depth),
+    material
   );
 
-  o.position.set(x, y, z);
-  o.castShadow = true;
-  o.receiveShadow = true;
+  object.position.set(x, y, z);
 
-  parent.add(o);
-  return o;
+  object.castShadow = true;
+  object.receiveShadow = true;
+
+  parent.add(object);
+
+  return object;
 }
+
+
+/* =========================================
+   MEMBUAT RUANGAN
+========================================= */
 
 function buildRoom() {
   roomGroup.clear();
 
-  const w = +roomW.value;
-  const d = +roomD.value;
-  const h = +roomH.value;
+  const width = Number(roomW.value);
+  const depth = Number(roomD.value);
+  const height = Number(roomH.value);
 
   const floorMat = mat(floorColor.value);
   const wallMat = mat(wallColor.value);
 
   // Lantai
-  box(w, 0.16, d, floorMat, 0, -0.08, 0);
+  box(
+    width,
+    0.16,
+    depth,
+    floorMat,
+    0,
+    -0.08,
+    0
+  );
 
-  // Dinding
-  box(w, h, 0.12, wallMat, 0, h / 2, -d / 2);
-  box(0.12, h, d, wallMat, -w / 2, h / 2, 0);
-  box(0.12, h, d, wallMat, w / 2, h / 2, 0);
+  // Dinding belakang
+  box(
+    width,
+    height,
+    0.12,
+    wallMat,
+    0,
+    height / 2,
+    -depth / 2
+  );
+
+  // Dinding kiri
+  box(
+    0.12,
+    height,
+    depth,
+    wallMat,
+    -width / 2,
+    height / 2,
+    0
+  );
+
+  // Dinding kanan
+  box(
+    0.12,
+    height,
+    depth,
+    wallMat,
+    width / 2,
+    height / 2,
+    0
+  );
 
   // Grid lantai
   const grid = new THREE.GridHelper(
-    Math.max(w, d),
-    Math.max(w, d),
+    Math.max(width, depth),
+    Math.max(width, depth),
     0x7886a5,
     0x4a5875
   );
 
   grid.position.y = 0.012;
+
   roomGroup.add(grid);
 
-  furniture.forEach(o => roomGroup.add(o));
+  // Memasukkan kembali furnitur
+  furniture.forEach(object => {
+    roomGroup.add(object);
+  });
 
   updateStats();
 }
 
-function makeFurniture(kind) {
-  const g = new THREE.Group();
 
-  const c = furnitureColor.value;
-  const m = mat(c);
-  const dark = mat('#39445b');
-  const soft = mat('#c8b8a7');
+/* =========================================
+   MEMBUAT FURNITUR
+========================================= */
+
+function makeFurniture(kind) {
+  const group = new THREE.Group();
+
+  const color = furnitureColor.value;
+
+  const mainMaterial = mat(color);
+  const darkMaterial = mat('#39445b');
+  const softMaterial = mat('#c8b8a7');
 
   // SOFA
   if (kind === 'sofa') {
-    box(2, 0.35, 0.85, m, 0, 0.45, 0, g);
-    box(2, 0.8, 0.22, m, 0, 0.95, -0.32, g);
+    box(2, 0.35, 0.85, mainMaterial, 0, 0.45, 0, group);
 
-    [-0.8, 0.8].forEach(x =>
-      box(0.25, 0.55, 0.85, dark, x, 0.65, 0, g)
-    );
+    box(2, 0.8, 0.22, mainMaterial, 0, 0.95, -0.32, group);
+
+    [-0.8, 0.8].forEach(x => {
+      box(
+        0.25, 0.55, 0.85,
+        darkMaterial,
+        x, 0.65, 0,
+        group
+      );
+    });
   }
 
   // TEMPAT TIDUR
   if (kind === 'bed') {
-    box(1.8, 0.28, 2.1, dark, 0, 0.25, 0, g);
-    box(1.7, 0.22, 1.75, soft, 0, 0.48, 0.12, g);
-    box(1.7, 0.35, 0.18, m, 0, 0.78, -0.9, g);
+    box(1.8, 0.28, 2.1, darkMaterial, 0, 0.25, 0, group);
 
-    [-0.5, 0.5].forEach(x =>
-      box(0.55, 0.14, 0.4, mat('#f5f0e8'), x, 0.68, -0.55, g)
-    );
+    box(1.7, 0.22, 1.75, softMaterial, 0, 0.48, 0.12, group);
+
+    box(1.7, 0.35, 0.18, mainMaterial, 0, 0.78, -0.9, group);
+
+    [-0.5, 0.5].forEach(x => {
+      box(
+        0.55, 0.14, 0.4,
+        mat('#f5f0e8'),
+        x, 0.68, -0.55,
+        group
+      );
+    });
   }
 
   // MEJA
   if (kind === 'table') {
-    box(1.5, 0.14, 0.9, m, 0, 0.85, 0, g);
+    box(1.5, 0.14, 0.9, mainMaterial, 0, 0.85, 0, group);
 
-    [-0.6, 0.6].forEach(x =>
-      [-0.32, 0.32].forEach(z =>
-        box(0.12, 0.82, 0.12, dark, x, 0.41, z, g)
-      )
-    );
+    [-0.6, 0.6].forEach(x => {
+      [-0.32, 0.32].forEach(z => {
+        box(
+          0.12, 0.82, 0.12,
+          darkMaterial,
+          x, 0.41, z,
+          group
+        );
+      });
+    });
   }
 
   // KURSI
   if (kind === 'chair') {
-    box(0.75, 0.15, 0.7, m, 0, 0.55, 0, g);
-    box(0.75, 0.85, 0.13, m, 0, 1, -0.28, g);
+    box(0.75, 0.15, 0.7, mainMaterial, 0, 0.55, 0, group);
 
-    [-0.28, 0.28].forEach(x =>
-      [-0.25, 0.25].forEach(z =>
-        box(0.1, 0.55, 0.1, dark, x, 0.27, z, g)
-      )
-    );
+    box(0.75, 0.85, 0.13, mainMaterial, 0, 1, -0.28, group);
+
+    [-0.28, 0.28].forEach(x => {
+      [-0.25, 0.25].forEach(z => {
+        box(
+          0.1, 0.55, 0.1,
+          darkMaterial,
+          x, 0.27, z,
+          group
+        );
+      });
+    });
   }
 
   // TANAMAN
@@ -156,7 +301,8 @@ function makeFurniture(kind) {
     );
 
     stem.position.y = 0.5;
-    g.add(stem);
+
+    group.add(stem);
 
     for (let i = 0; i < 6; i++) {
       const leaf = new THREE.Mesh(
@@ -172,15 +318,25 @@ function makeFurniture(kind) {
         Math.sin(i) * 0.25
       );
 
-      g.add(leaf);
+      group.add(leaf);
     }
 
-    box(0.55, 0.5, 0.55, mat('#bd7958'), 0, 0.25, 0, g);
+    box(
+      0.55, 0.5, 0.55,
+      mat('#bd7958'),
+      0, 0.25, 0,
+      group
+    );
   }
 
   // LAMPU
   if (kind === 'lamp') {
-    box(0.12, 1.5, 0.12, dark, 0, 0.75, 0, g);
+    box(
+      0.12, 1.5, 0.12,
+      darkMaterial,
+      0, 0.75, 0,
+      group
+    );
 
     const shade = new THREE.Mesh(
       new THREE.ConeGeometry(0.45, 0.45, 20, 1, true),
@@ -188,206 +344,329 @@ function makeFurniture(kind) {
     );
 
     shade.position.y = 1.55;
-    g.add(shade);
 
-    box(0.55, 0.08, 0.55, dark, 0, 0.05, 0, g);
+    group.add(shade);
+
+    box(
+      0.55, 0.08, 0.55,
+      darkMaterial,
+      0, 0.05, 0,
+      group
+    );
   }
 
-  g.userData = {
-    kind,
-    color: c
+  // Informasi furnitur
+  group.userData = {
+    kind: kind,
+    color: color
   };
 
-  g.position.set(
+  // Posisi awal furnitur
+  group.position.set(
     (Math.random() - 0.5) * 2,
     0,
     (Math.random() - 0.5) * 2
   );
 
-  furniture.push(g);
+  furniture.push(group);
 
   buildRoom();
-  select(g);
+
+  selectFurniture(group);
 }
 
-function select(o) {
-  selected = o;
 
-  selectedName.textContent = o
-    ? o.userData.kind
-    : 'Belum ada objek dipilih.';
+/* =========================================
+   MEMILIH FURNITUR
+========================================= */
 
-  if (o) {
-    selectedColor.value = o.userData.color;
+function selectFurniture(object) {
+  selected = object;
+
+  if (selectedName) {
+    selectedName.textContent = object
+      ? object.userData.kind
+      : 'Belum ada objek dipilih.';
+  }
+
+  if (object && selectedColor) {
+    selectedColor.value = object.userData.color;
   }
 }
 
-// Tambah furnitur
+
+/* =========================================
+   TOMBOL TAMBAH FURNITUR
+========================================= */
+
 document.querySelectorAll('[data-kind]').forEach(button => {
-  button.onclick = () => makeFurniture(button.dataset.kind);
+  button.addEventListener('click', () => {
+    makeFurniture(button.dataset.kind);
+  });
 });
 
-// Terapkan ukuran dan warna ruangan
-apply.onclick = () => {
-  buildRoom();
-  area.textContent = (+roomW.value * +roomD.value) + ' m²';
-};
 
-// Ganti warna objek
-selectedColor.oninput = () => {
-  if (selected) {
-    selected.traverse(o => {
-      if (o.isMesh && o.material.color) {
-        o.material.color.set(selectedColor.value);
+/* =========================================
+   MENGATUR RUANGAN
+========================================= */
+
+if (apply) {
+  apply.addEventListener('click', () => {
+    buildRoom();
+  });
+}
+
+// Warna lantai
+if (floorColor) {
+  floorColor.addEventListener('input', buildRoom);
+}
+
+// Warna dinding
+if (wallColor) {
+  wallColor.addEventListener('input', buildRoom);
+}
+
+
+/* =========================================
+   MENGUBAH WARNA FURNITUR
+========================================= */
+
+if (selectedColor) {
+  selectedColor.addEventListener('input', () => {
+    if (!selected) return;
+
+    selected.traverse(object => {
+      if (object.isMesh && object.material.color) {
+        object.material.color.set(selectedColor.value);
       }
     });
 
     selected.userData.color = selectedColor.value;
-  }
-};
-
-// Putar objek
-rotate.onclick = () => {
-  if (selected) {
-    selected.rotation.y += Math.PI / 4;
-  }
-};
-
-// Hapus objek
-delete.onclick = () => {
-  if (selected) {
-    furniture = furniture.filter(x => x !== selected);
-    select(null);
-    buildRoom();
-  }
-};
-
-// Reset desain
-reset.onclick = () => {
-  furniture = [];
-  select(null);
-  buildRoom();
-};
-
-// Statistik
-function updateStats() {
-  count.textContent = furniture.length;
-  area.textContent =
-    (+roomW.value * +roomD.value) + ' m²';
+  });
 }
 
-// Simpan desain menjadi JSON
-save.onclick = () => {
-  const data = {
-    project: project.value,
 
-    room: {
-      width: roomW.value,
-      depth: roomD.value,
-      height: roomH.value,
-      wall: wallColor.value,
-      floor: floorColor.value
-    },
+/* =========================================
+   MEMUTAR FURNITUR
+========================================= */
 
-    furniture: furniture.map(o => ({
-      type: o.userData.kind,
-      x: o.position.x,
-      z: o.position.z,
-      rotation: o.rotation.y,
-      color: o.userData.color
-    }))
-  };
+if (rotate) {
+  rotate.addEventListener('click', () => {
+    if (!selected) return;
 
-  const a = document.createElement('a');
+    selected.rotation.y += Math.PI / 4;
+  });
+}
 
-  a.href = URL.createObjectURL(
-    new Blob(
+
+/* =========================================
+   MENGHAPUS FURNITUR
+========================================= */
+
+if (deleteBtn) {
+  deleteBtn.addEventListener('click', () => {
+    if (!selected) return;
+
+    furniture = furniture.filter(
+      object => object !== selected
+    );
+
+    selectFurniture(null);
+
+    buildRoom();
+  });
+}
+
+
+/* =========================================
+   RESET DESAIN
+========================================= */
+
+if (reset) {
+  reset.addEventListener('click', () => {
+    furniture = [];
+
+    selectFurniture(null);
+
+    buildRoom();
+  });
+}
+
+
+/* =========================================
+   STATISTIK RUANGAN
+========================================= */
+
+function updateStats() {
+  if (count) {
+    count.textContent = furniture.length;
+  }
+
+  if (area) {
+    area.textContent =
+      (Number(roomW.value) * Number(roomD.value)) + ' m²';
+  }
+}
+
+
+/* =========================================
+   MENYIMPAN DESAIN
+========================================= */
+
+if (save) {
+  save.addEventListener('click', () => {
+    const data = {
+      project: project ? project.value : 'RoomVision Design',
+
+      room: {
+        width: roomW.value,
+        depth: roomD.value,
+        height: roomH.value,
+        wall: wallColor ? wallColor.value : '#ffffff',
+        floor: floorColor ? floorColor.value : '#cccccc'
+      },
+
+      furniture: furniture.map(object => ({
+        type: object.userData.kind,
+        x: object.position.x,
+        z: object.position.z,
+        rotation: object.rotation.y,
+        color: object.userData.color
+      }))
+    };
+
+    const blob = new Blob(
       [JSON.stringify(data, null, 2)],
       { type: 'application/json' }
-    )
-  );
+    );
 
-  a.download = 'roomvision-design.json';
-  a.click();
+    const url = URL.createObjectURL(blob);
 
-  URL.revokeObjectURL(a.href);
-};
+    const link = document.createElement('a');
 
-// Kamera 3D
+    link.href = url;
+    link.download = 'roomvision-design.json';
+
+    link.click();
+
+    URL.revokeObjectURL(url);
+  });
+}
+
+
+/* =========================================
+   KONTROL KAMERA 3D
+========================================= */
+
 let dragging = false;
-let px = 0;
-let py = 0;
+
+let previousX = 0;
+let previousY = 0;
 
 let theta = 0.65;
 let phi = 1.0;
 let radius = 13;
 
-canvas.addEventListener('pointerdown', e => {
+// Mulai menggeser kamera
+canvas.addEventListener('pointerdown', event => {
   dragging = true;
-  px = e.clientX;
-  py = e.clientY;
-  canvas.setPointerCapture(e.pointerId);
+
+  previousX = event.clientX;
+  previousY = event.clientY;
+
+  canvas.setPointerCapture(event.pointerId);
 });
 
+// Berhenti menggeser kamera
 canvas.addEventListener('pointerup', () => {
   dragging = false;
 });
 
-canvas.addEventListener('pointermove', e => {
+canvas.addEventListener('pointercancel', () => {
+  dragging = false;
+});
+
+// Rotasi kamera
+canvas.addEventListener('pointermove', event => {
   if (!dragging) return;
 
-  theta -= (e.clientX - px) * 0.008;
+  theta -= (event.clientX - previousX) * 0.008;
 
   phi = Math.max(
     0.25,
-    Math.min(1.45, phi + (e.clientY - py) * 0.006)
+    Math.min(
+      1.45,
+      phi + (event.clientY - previousY) * 0.006
+    )
   );
 
-  px = e.clientX;
-  py = e.clientY;
+  previousX = event.clientX;
+  previousY = event.clientY;
 });
 
-// Zoom kamera
-canvas.addEventListener('wheel', e => {
+
+/* =========================================
+   ZOOM KAMERA
+========================================= */
+
+canvas.addEventListener('wheel', event => {
   radius = Math.max(
     7,
-    Math.min(22, radius + e.deltaY * 0.01)
+    Math.min(
+      22,
+      radius + event.deltaY * 0.01
+    )
   );
 
-  e.preventDefault();
+  event.preventDefault();
 }, { passive: false });
 
-// Pilih furnitur dengan klik
+
+/* =========================================
+   MEMILIH FURNITUR DENGAN KLIK
+========================================= */
+
 const raycaster = new THREE.Raycaster();
+
 const mouse = new THREE.Vector2();
 
-canvas.addEventListener('click', e => {
+canvas.addEventListener('click', event => {
   const rect = canvas.getBoundingClientRect();
 
   mouse.x =
-    ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    ((event.clientX - rect.left) / rect.width) * 2 - 1;
 
   mouse.y =
-    -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
 
-  const hits = raycaster.intersectObjects(furniture, true);
+  const hits = raycaster.intersectObjects(
+    furniture,
+    true
+  );
 
-  if (hits.length) {
-    let o = hits[0].object;
+  if (hits.length === 0) return;
 
-    while (o.parent && o.parent !== roomGroup) {
-      o = o.parent;
-    }
+  let object = hits[0].object;
 
-    if (furniture.includes(o)) {
-      select(o);
-    }
+  while (
+    object.parent &&
+    object.parent !== roomGroup
+  ) {
+    object = object.parent;
+  }
+
+  if (furniture.includes(object)) {
+    selectFurniture(object);
   }
 });
 
-// Animasi
+
+/* =========================================
+   ANIMASI 3D
+========================================= */
+
 function animate() {
   requestAnimationFrame(animate);
 
@@ -402,17 +681,37 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-// Jalankan aplikasi
-buildRoom();
-animate();
 
-// Responsive canvas
-new ResizeObserver(() => {
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
+/* =========================================
+   RESPONSIVE CANVAS
+========================================= */
 
-  renderer.setSize(w, h, false);
+function resizeRenderer() {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
 
-  camera.aspect = w / h;
+  if (!width || !height) return;
+
+  renderer.setSize(width, height, false);
+
+  camera.aspect = width / height;
+
   camera.updateProjectionMatrix();
-}).observe(canvas);
+}
+
+const resizeObserver = new ResizeObserver(() => {
+  resizeRenderer();
+});
+
+resizeObserver.observe(canvas);
+
+
+/* =========================================
+   MENJALANKAN ROOMVISION 3D
+========================================= */
+
+resizeRenderer();
+
+buildRoom();
+
+animate();
